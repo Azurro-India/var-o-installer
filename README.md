@@ -10,44 +10,42 @@ This repo is only the installer. It does **not** contain product source, YOLO we
 irm https://raw.githubusercontent.com/Azurro-India/var-o-installer/main/install.ps1 | iex
 ```
 
-The script will ask for:
+You will be asked for:
 
-1. **Payload zip URL** — private edge release (not a git clone)
-2. **Device token** — mint on the operator laptop with `varo token issue`
+1. **Payload zip URL** — HTTPS URL of `varo-edge.zip` (not a git clone, not a GitHub PAT)
+2. **Device token** — `varo token issue` on the operator laptop
 
-It then writes `C:\varo\.env`, installs NSSM service `AzurroVaroSampler`, and starts it.
+The script writes `C:\varo\.env`, creates a **local** Python 3.12 venv, installs CPU torch + the package, registers NSSM `AzurroVaroSampler`, and starts it.
 
-Optional (no prompts):
+Python **3.12** must already be on the box (`py -3.12`).
 
-```powershell
-iex "& { $(irm https://raw.githubusercontent.com/Azurro-India/var-o-installer/main/install.ps1) } -PayloadUrl 'https://example/varo-edge.zip' -DeviceToken 'varo_...'"
+## How to get the payload URL (Main is private)
+
+On your laptop (you are logged into GitHub):
+
+```bash
+# after Actions builds a release — tag varo-v0.2.0 or run workflow "Release edge zip"
+gh release download varo-v0.2.0 -R Azurro-India/Main -p varo-edge.zip
 ```
+
+Host that file somewhere the box can GET without a GitHub token (signed S3/Drive link you control). Paste that URL into the installer.
+
+Do **not** put a GitHub PAT on the edge box.
 
 ## What lands on the box
 
 ```
 C:\varo\
-  bin\nssm.exe
-  .venv\Scripts\varo.exe   (or bin\varo.exe — whatever the zip contains)
+  app\ + pyproject.toml     from the zip
+  .venv\Scripts\varo.exe    built on this machine
   models\yolo11m.pt
+  bin\nssm.exe
   logs\
-  .env                     VARO_API_URL + VARO_DEVICE_TOKEN
+  .env                      VARO_API_URL + VARO_DEVICE_TOKEN + VARO_YOLO_MODEL
   version.txt
 ```
 
 Default API: `https://var-o1-api.onrender.com`
-
-## Payload zip (built from Main, not this repo)
-
-Must include a runnable `varo.exe` at one of:
-
-- `varo.exe`
-- `bin\varo.exe`
-- `.venv\Scripts\varo.exe`
-
-Should include `yolo11m.pt`. Must **not** include Scoresheets, tests, or `.git`.
-
-There is no tag-built zip yet. Until CI exists, build one by hand and pass its URL.
 
 ## After install
 
@@ -58,16 +56,8 @@ sc query AzurroVaroSampler
 Get-Content C:\varo\logs\varo-stdout.log -Tail 30
 ```
 
-## Update
-
-```powershell
-irm https://raw.githubusercontent.com/Azurro-India/var-o-installer/main/update.ps1 | iex
-```
-
-Keeps `.env` and spool files. Replaces the payload and restarts the service.
-
 ## Security
 
-- Public script on purpose. No GitHub PAT. No DB password.
-- A box only works if it has a valid device token.
-- Protect `main` on this repo: `irm | iex` as Admin means a push here is code execution on every box.
+- Public script. No PAT. No DB password.
+- Box only works with a valid device token.
+- Protect `main` here: `irm | iex` as Admin is code execution on every box.
